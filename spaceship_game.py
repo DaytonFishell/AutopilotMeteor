@@ -1,6 +1,10 @@
 import pygame
 import random
 import math
+import time
+import json
+from dataclasses import dataclass
+from typing import List, Tuple
 
 # Initialize Pygame
 pygame.init()
@@ -20,6 +24,61 @@ CENTERING_STRENGTH = 0.1
 # Set up display
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Autopilot Spaceship")
+
+@dataclass
+class NearMissEvent:
+    timestamp: float  # Time since game start
+    distance: float  # Distance between ship and meteor
+    ship_position: tuple[float, float]
+    meteor_position: tuple[float, float]
+    ship_velocity: tuple[float, float]
+    meteor_velocity: tuple[float, float]
+
+class GameTracker:
+    def __init__(self):
+        self.start_time = time.time()
+        self.near_misses: List[NearMissEvent] = []
+        self.danger_threshold = 50  # Distance to consider a near miss
+        self.critical_threshold = 35  # Distance to consider a critical near miss
+        
+    def track_frame(self, spaceship, meteors):
+        current_time = time.time() - self.start_time
+        
+        for meteor in meteors:
+            distance = math.hypot(spaceship.x - meteor.x, spaceship.y - meteor.y)
+            
+            # Check for near misses
+            if distance < self.danger_threshold and distance > SPACESHIP_SIZE + METEOR_SIZE:
+                event = NearMissEvent(
+                    timestamp=current_time,
+                    distance=distance,
+                    ship_position=(spaceship.x, spaceship.y),
+                    meteor_position=(meteor.x, meteor.y),
+                    ship_velocity=(spaceship.velocity_x, spaceship.velocity_y),
+                    meteor_velocity=(meteor.velocity_x, meteor.velocity_y)
+                )
+                self.near_misses.append(event)
+    
+    def save_analytics(self, filename="game_analytics.json"):
+        analytics = {
+            "total_runtime": time.time() - self.start_time,
+            "total_near_misses": len(self.near_misses),
+            "near_misses": [
+                {
+                    "timestamp": event.timestamp,
+                    "distance": event.distance,
+                    "ship_position": event.ship_position,
+                    "meteor_position": event.meteor_position,
+                    "ship_velocity": event.ship_velocity,
+                    "meteor_velocity": event.meteor_velocity,
+                    "severity": "CRITICAL" if event.distance < self.critical_threshold else "WARNING"
+                }
+                for event in self.near_misses
+            ]
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(analytics, f, indent=2)
 
 class Spaceship:
     def __init__(self):
@@ -131,7 +190,8 @@ def main():
     running = True
     score = 0
     font = pygame.font.Font(None, 36)
-    
+    tracker = GameTracker()  # Initialize the game tracker
+
     while running:
         screen.fill((0, 0, 0))
         
@@ -152,6 +212,9 @@ def main():
         # Spaceship AI and drawing
         spaceship.avoid_meteors(meteors)
         spaceship.draw()
+        
+        # Track near misses
+        tracker.track_frame(spaceship, meteors)
         
         # Collision detection
         for meteor in meteors:
@@ -177,6 +240,10 @@ def main():
     text = font.render(f"Game Over! Final Score: {score//10}", True, WHITE)
     screen.blit(text, (WIDTH//2 - 180, HEIGHT//2 - 18))
     pygame.display.flip()
+    
+    # Save analytics before quitting
+    tracker.save_analytics()
+    
     pygame.time.wait(3000)
     pygame.quit()
 
