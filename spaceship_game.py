@@ -1,0 +1,184 @@
+import pygame
+import random
+import math
+
+# Initialize Pygame
+pygame.init()
+
+# Constants
+WIDTH, HEIGHT = 800, 600
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+SPACESHIP_SIZE = 10
+METEOR_SIZE = 25
+MAX_SPEED = 5
+DETECTION_RADIUS = 110
+AVOIDANCE_STRENGTH = 0.5
+CENTERING_STRENGTH = 0.1
+
+# Set up display
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Autopilot Spaceship")
+
+class Spaceship:
+    def __init__(self):
+        self.x = WIDTH // 2
+        self.y = HEIGHT // 2
+        self.velocity_x = 0
+        self.velocity_y = 0
+        self.angle = 0  # New angle attribute
+        
+    def avoid_meteors(self, meteors):
+        avoidance_vector = [0, 0]
+        in_danger = False
+        
+        for meteor in meteors:
+            distance = math.hypot(self.x - meteor.x, self.y - meteor.y)
+            if distance < DETECTION_RADIUS and distance > 0:
+                in_danger = True
+                avoidance_vector[0] += (self.x - meteor.x) / distance
+                avoidance_vector[1] += (self.y - meteor.y) / distance
+                
+        # Normalize and apply avoidance
+        length = math.hypot(*avoidance_vector)
+        if length > 0:
+            self.velocity_x += (avoidance_vector[0] / length) * AVOIDANCE_STRENGTH
+            self.velocity_y += (avoidance_vector[1] / length) * AVOIDANCE_STRENGTH
+            
+        # If not in danger, move towards the center of the screen
+        if not in_danger:
+            center_x = WIDTH / 2
+            center_y = HEIGHT / 2
+            dx = center_x - self.x
+            dy = center_y - self.y
+            norm = math.hypot(dx, dy)
+            if norm != 0:
+                dx /= norm
+                dy /= norm
+            self.velocity_x += dx * CENTERING_STRENGTH
+            self.velocity_y += dy * CENTERING_STRENGTH
+            
+        # Limit speed
+        speed = math.hypot(self.velocity_x, self.velocity_y)
+        if speed > MAX_SPEED:
+            self.velocity_x = (self.velocity_x / speed) * MAX_SPEED
+            self.velocity_y = (self.velocity_y / speed) * MAX_SPEED
+            
+        # Calculate angle
+        if self.velocity_x != 0 or self.velocity_y != 0:
+            self.angle = math.degrees(math.atan2(-self.velocity_y, self.velocity_x))
+            
+        self.x += self.velocity_x
+        self.y += self.velocity_y
+        
+        # Keep within screen bounds
+        self.x = max(SPACESHIP_SIZE, min(WIDTH - SPACESHIP_SIZE, self.x))
+        self.y = max(SPACESHIP_SIZE, min(HEIGHT - SPACESHIP_SIZE, self.y))
+        
+    def draw(self):
+        # Define the original points of the spaceship
+        points = [
+            (self.x, self.y + SPACESHIP_SIZE),  # New front of the ship
+            (self.x - SPACESHIP_SIZE, self.y - SPACESHIP_SIZE),
+            (self.x + SPACESHIP_SIZE, self.y - SPACESHIP_SIZE)
+        ]
+        
+        # Rotate the points
+        rotated_points = [
+            (
+                self.x + (x - self.x) * math.cos(math.radians(self.angle)) - (y - self.y) * math.sin(math.radians(self.angle)),
+                self.y + (x - self.x) * math.sin(math.radians(self.angle)) + (y - self.y) * math.cos(math.radians(self.angle))
+            )
+            for x, y in points
+        ]
+        
+        # Draw the rotated polygon
+        pygame.draw.polygon(screen, BLUE, rotated_points)
+
+class Meteor:
+    def __init__(self):
+        side = random.choice(['left', 'right', 'top', 'bottom'])
+        if side == 'left':
+            self.x = 0
+            self.y = random.randint(0, HEIGHT)
+        elif side == 'right':
+            self.x = WIDTH
+            self.y = random.randint(0, HEIGHT)
+        elif side == 'top':
+            self.x = random.randint(0, WIDTH)
+            self.y = 0
+        else:
+            self.x = random.randint(0, WIDTH)
+            self.y = HEIGHT
+            
+        angle = random.uniform(0, 2 * math.pi)
+        self.speed = random.randint(1, 3)
+        self.velocity_x = math.cos(angle) * self.speed
+        self.velocity_y = math.sin(angle) * self.speed
+        
+    def update(self):
+        self.x += self.velocity_x
+        self.y += self.velocity_y
+        
+    def draw(self):
+        pygame.draw.circle(screen, RED, (int(self.x), int(self.y)), METEOR_SIZE)
+
+def main():
+    clock = pygame.time.Clock()
+    spaceship = Spaceship()
+    meteors = []
+    running = True
+    score = 0
+    font = pygame.font.Font(None, 36)
+    
+    while running:
+        screen.fill((0, 0, 0))
+        
+        # Spawn meteors
+        if random.random() < 0.05:
+            meteors.append(Meteor())
+            
+        # Update and draw meteors
+        for meteor in meteors[:]:
+            meteor.update()
+            meteor.draw()
+            
+            # Remove off-screen meteors
+            if (meteor.x < -METEOR_SIZE or meteor.x > WIDTH + METEOR_SIZE or 
+                meteor.y < -METEOR_SIZE or meteor.y > HEIGHT + METEOR_SIZE):
+                meteors.remove(meteor)
+                
+        # Spaceship AI and drawing
+        spaceship.avoid_meteors(meteors)
+        spaceship.draw()
+        
+        # Collision detection
+        for meteor in meteors:
+            distance = math.hypot(spaceship.x - meteor.x, spaceship.y - meteor.y)
+            if distance < SPACESHIP_SIZE + METEOR_SIZE:
+                running = False
+                
+        # Update score
+        score += 1
+        text = font.render(f"Score: {score//10}", True, WHITE)
+        screen.blit(text, (10, 10))
+        
+        # Event handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                
+        pygame.display.flip()
+        clock.tick(60)
+        
+    # Game over screen
+    screen.fill((0, 0, 0))
+    text = font.render(f"Game Over! Final Score: {score//10}", True, WHITE)
+    screen.blit(text, (WIDTH//2 - 180, HEIGHT//2 - 18))
+    pygame.display.flip()
+    pygame.time.wait(3000)
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
