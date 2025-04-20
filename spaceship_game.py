@@ -35,6 +35,19 @@ class NearMissEvent:
     meteor_velocity: tuple[float, float]
 
 class GameTracker:
+    """A class for tracking and analyzing game events and near-misses between spaceship and meteors.
+    This class maintains records of near-miss events during gameplay and provides functionality
+    to save analytics data to a JSON file. It tracks distances between the spaceship and meteors,
+    recording events when they come within a defined danger threshold.
+    Attributes:
+        start_time (float): The timestamp when tracking began
+        near_misses (List[NearMissEvent]): List of recorded near-miss events
+        danger_threshold (int): Distance threshold (in pixels) to consider an event a near miss (default: 50)
+        critical_threshold (int): Distance threshold (in pixels) to consider an event critical (default: 35)
+    Methods:
+        track_frame(spaceship, meteors): Analyzes current frame for near-miss events
+        save_analytics(filename): Saves collected analytics data to a JSON file
+    """
     def __init__(self):
         self.start_time = time.time()
         self.near_misses: List[NearMissEvent] = []
