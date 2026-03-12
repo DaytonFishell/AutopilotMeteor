@@ -94,6 +94,23 @@ class GameTracker:
             json.dump(analytics, f, indent=2)
 
 class Spaceship:
+    """An autonomous spaceship that navigates through meteors using AI-driven avoidance.
+
+    The spaceship uses a force-based autopilot system that detects nearby meteors,
+    calculates repulsion vectors, and maintains optimal positioning by centering
+    when safe. The ship rotates to face its direction of travel for visual feedback.
+
+    Attributes:
+        x (float): Current x-coordinate position (initialized to screen center)
+        y (float): Current y-coordinate position (initialized to screen center)
+        velocity_x (float): Horizontal velocity component in pixels per frame
+        velocity_y (float): Vertical velocity component in pixels per frame
+        angle (float): Current rotation angle in degrees for rendering
+
+    Methods:
+        avoid_meteors(meteors): Executes autopilot AI to navigate around threats
+        draw(): Renders the spaceship as a rotated blue triangle
+    """
     def __init__(self):
         self.x = WIDTH // 2
         self.y = HEIGHT // 2
@@ -102,6 +119,21 @@ class Spaceship:
         self.angle = 0  # New angle attribute
         
     def avoid_meteors(self, meteors):
+        """Execute the autopilot AI algorithm to avoid meteors and maintain optimal positioning.
+
+        This method implements a force-based avoidance system with multiple behaviors:
+        1. Threat Detection: Scans for meteors within DETECTION_RADIUS (110 pixels)
+        2. Avoidance: Calculates and applies repulsion vectors from detected threats
+        3. Centering: Gently pulls toward screen center when no danger present
+        4. Speed Limiting: Caps velocity at MAX_SPEED (5 pixels/frame)
+        5. Orientation: Updates angle to face direction of travel
+        6. Boundary Enforcement: Keeps ship within screen bounds
+
+        Args:
+            meteors (list): List of Meteor objects to avoid
+
+        Algorithm Complexity: O(n) where n is the number of meteors on screen
+        """
         avoidance_vector = [0, 0]
         in_danger = False
         
@@ -149,6 +181,18 @@ class Spaceship:
         self.y = max(SPACESHIP_SIZE, min(HEIGHT - SPACESHIP_SIZE, self.y))
         
     def draw(self):
+        """Render the spaceship as a rotated blue triangle.
+
+        Draws an isosceles triangle that rotates to face the ship's direction
+        of travel. Uses 2D rotation matrix transformation to rotate the three
+        vertices around the ship's center point based on the current angle.
+
+        The triangle has:
+        - Base width: 20 pixels (2 * SPACESHIP_SIZE)
+        - Height: 20 pixels (2 * SPACESHIP_SIZE)
+        - Color: Blue (RGB: 0, 0, 255)
+        - Orientation: Points in direction of velocity vector
+        """
         # Define the original points of the spaceship
         points = [
             (self.x, self.y + SPACESHIP_SIZE),  # New front of the ship
@@ -169,6 +213,23 @@ class Spaceship:
         pygame.draw.polygon(screen, BLUE, rotated_points)
 
 class Meteor:
+    """A falling obstacle that spawns from screen edges and moves in a random direction.
+
+    Meteors spawn from random positions along the four edges of the screen and
+    travel in random directions at varying speeds. They are automatically removed
+    when they exit the screen bounds.
+
+    Attributes:
+        x (float): Current x-coordinate position
+        y (float): Current y-coordinate position
+        velocity_x (float): Horizontal velocity component in pixels per frame
+        velocity_y (float): Vertical velocity component in pixels per frame
+        speed (int): Random speed value between 1-3 pixels per frame
+
+    Methods:
+        update(): Updates position based on velocity
+        draw(): Renders the meteor as a red circle
+    """
     def __init__(self):
         side = random.choice(['left', 'right', 'top', 'bottom'])
         if side == 'left':
@@ -183,17 +244,19 @@ class Meteor:
         else:
             self.x = random.randint(0, WIDTH)
             self.y = HEIGHT
-            
+
         angle = random.uniform(0, 2 * math.pi)
         self.speed = random.randint(1, 3)
         self.velocity_x = math.cos(angle) * self.speed
         self.velocity_y = math.sin(angle) * self.speed
         
     def update(self):
+        """Update meteor position based on current velocity using Euler integration."""
         self.x += self.velocity_x
         self.y += self.velocity_y
-        
+
     def draw(self):
+        """Render the meteor as a red circle with radius METEOR_SIZE (25 pixels)."""
         pygame.draw.circle(screen, RED, (int(self.x), int(self.y)), METEOR_SIZE)
 
 def main():
